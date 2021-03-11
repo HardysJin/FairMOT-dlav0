@@ -22,11 +22,11 @@ class opts(object):
         # train
         self.parser.add_argument('--lr', type=float, default=1e-4,
                                 help='learning rate for batch size 12.')
-        self.parser.add_argument('--lr_step', type=str, default='20',
+        self.parser.add_argument('--lr_step', type=str, default='20,25',
                                 help='drop learning rate by 10.')
-        self.parser.add_argument('--num_epochs', type=int, default=3,
+        self.parser.add_argument('--num_epochs', type=int, default=30,
                                 help='total training epochs.')
-        self.parser.add_argument('--batch_size', type=int, default=1,
+        self.parser.add_argument('--batch_size', type=int, default=3,
                                 help='batch size')
         self.parser.add_argument('--num_iters', type=int, default=-1,
                                 help='default: #samples / batch_size.')
@@ -78,18 +78,26 @@ class opts(object):
         self.parser.add_argument('--hide_data_time', action='store_true',
                                 help='not display time during training.')
 
-        # self.parser.add_argument('--norm_wh', action='store_true',
-        #                         help='L1(\hat(y) / y, 1) or L1(\hat(y), y)')
-        # self.parser.add_argument('--dense_wh', action='store_true',
-        #                         help='apply weighted regression near center or '
-        #                             'just apply regression on center point.')
-        # self.parser.add_argument('--cat_spec_wh', action='store_true',
-        #                         help='category specific bounding box size.')
-        # self.parser.add_argument('--not_reg_offset', action='store_true',
-        #                         help='not regress local offset.')
+        self.parser.add_argument('--norm_wh', action='store_true',
+                                help='L1(\hat(y) / y, 1) or L1(\hat(y), y)')
+        self.parser.add_argument('--dense_wh', action='store_true',
+                                help='apply weighted regression near center or '
+                                    'just apply regression on center point.')
+        self.parser.add_argument('--cat_spec_wh', action='store_true',
+                                help='category specific bounding box size.')
+        self.parser.add_argument('--not_reg_offset', action='store_true',
+                                help='not regress local offset.')
+        
+        
 
     def init(self):
         opt = self.parser.parse_args()
+        
+        opt.reg_offset = not opt.not_reg_offset
+        opt.num_stacks = 1
+        
+        opt.save_dir = "../pretrained"
+        opt.lr_step = [int(i) for i in opt.lr_step.split(',')]
         if opt.resume:
             assert opt.load_model != "", "Trying to resume but weights path NOT defined"
         opt.gpus = [0] # add more gpu here

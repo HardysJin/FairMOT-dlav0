@@ -16,52 +16,105 @@ from fair.utils.post_process import ctdet_post_process
 from fair.base_trainer import BaseTrainer
 
 
+# class MotLoss(torch.nn.Module):
+#     def __init__(self, opt):
+#         super(MotLoss, self).__init__()
+#         self.opt = opt
+
+#         # define loss criterion
+#         self.crit_hm = nn.MSELoss() if opt.mse_loss else FocalLoss()
+#         self.crit_wh = RegL1Loss()
+#         self.crit_reg = RegL1Loss()
+#         self.crit_id = nn.CrossEntropyLoss(ignore_index=-1)
+        
+#         self.classifier = nn.Linear(opt.reid_dim, opt.nID)
+
+#         self.s_det = nn.Parameter(-1.85 * torch.ones(1))
+#         self.s_id = nn.Parameter(-1.05 * torch.ones(1))
+        
+#         # self.opt = opt
+#         # self.emb_dim = opt.reid_dim
+#         # self.nID = opt.nID
+#         # self.classifier = nn.Linear(self.emb_dim, self.nID)
+#         # self.IDLoss = nn.CrossEntropyLoss(ignore_index=-1)
+#         # self.emb_scale = math.sqrt(2) * math.log(self.nID - 1)
+#         # self.s_det = nn.Parameter(-1.85 * torch.ones(1))
+#         # self.s_id = nn.Parameter(-1.05 * torch.ones(1))
+
+
+#     def forward(self, outputs, batch):
+#         opt = self.opt
+#         hm_loss, wh_loss, off_loss, id_loss = 0, 0, 0, 0
+        
+#         output = outputs[0]
+#         if not opt.mse_loss:
+#             output['hm'] = _sigmoid(output['hm'])
+
+#         hm_loss = self.crit_hm(output['hm'], batch['hm'])
+#         wh_loss = self.crit_reg(output['wh'], batch['reg_mask'], batch['ind'], batch['wh'])
+
+#         off_loss = self.crit_reg(output['reg'], batch['reg_mask'], batch['ind'], batch['reg'])
+
+#         id_head = _tranpose_and_gather_feat(output['id'], batch['ind'])
+#         id_head = id_head[batch['reg_mask'] > 0].contiguous()
+#         id_head = math.sqrt(2) * math.log(opt.nID - 1)* F.normalize(id_head)
+#         id_target = batch['ids'][batch['reg_mask'] > 0]
+
+#         id_output = self.classifier(id_head).contiguous()
+#         id_loss = self.crit_id(id_output, id_target)
+
+#         det_loss = opt.hm_weight * hm_loss + opt.wh_weight * wh_loss + opt.off_weight * off_loss
+
+#         loss = torch.exp(-self.s_det) * det_loss + torch.exp(-self.s_id) * id_loss + (self.s_det + self.s_id)
+#         loss *= 0.5
+
+#         loss_stats = {'loss': loss, 'hm_loss': hm_loss,
+#                       'wh_loss': wh_loss, 'off_loss': off_loss, 'id_loss': id_loss}
+        # return loss, loss_stats
+
 class MotLoss(torch.nn.Module):
     def __init__(self, opt):
         super(MotLoss, self).__init__()
-        self.opt = opt
-
-        # define loss criterion
-        self.crit_hm = nn.MSELoss() if opt.mse_loss else FocalLoss()
-        self.crit_wh = RegL1Loss()
+        self.crit = torch.nn.MSELoss() if opt.mse_loss else FocalLoss()
         self.crit_reg = RegL1Loss()
-        self.crit_id = nn.CrossEntropyLoss(ignore_index=-1)
-        
-        self.classifier = nn.Linear(opt.reid_dim, opt.nID)
-
+        self.crit_wh = torch.nn.L1Loss(reduction='sum') if opt.dense_wh else \
+            NormRegL1Loss() if opt.norm_wh else \
+                RegWeightedL1Loss() if opt.cat_spec_wh else self.crit_reg
+        self.opt = opt
+        self.emb_dim = opt.reid_dim
+        self.nID = opt.nID
+        self.classifier = nn.Linear(self.emb_dim, self.nID)
+        self.IDLoss = nn.CrossEntropyLoss(ignore_index=-1)
+        self.emb_scale = math.sqrt(2) * math.log(self.nID - 1)
         self.s_det = nn.Parameter(-1.85 * torch.ones(1))
         self.s_id = nn.Parameter(-1.05 * torch.ones(1))
-        
-        # self.opt = opt
-        # self.emb_dim = opt.reid_dim
-        # self.nID = opt.nID
-        # self.classifier = nn.Linear(self.emb_dim, self.nID)
-        # self.IDLoss = nn.CrossEntropyLoss(ignore_index=-1)
-        # self.emb_scale = math.sqrt(2) * math.log(self.nID - 1)
-        # self.s_det = nn.Parameter(-1.85 * torch.ones(1))
-        # self.s_id = nn.Parameter(-1.05 * torch.ones(1))
-
 
     def forward(self, outputs, batch):
         opt = self.opt
         hm_loss, wh_loss, off_loss, id_loss = 0, 0, 0, 0
-        
-        output = outputs[0]
-        if not opt.mse_loss:
-            output['hm'] = _sigmoid(output['hm'])
+        for s in range(opt.num_stacks):
+            output = outputs[s]
+            if not opt.mse_loss:
+                output['hm'] = _sigmoid(output['hm'])
 
-        hm_loss = self.crit_hm(output['hm'], batch['hm'])
-        wh_loss = self.crit_reg(output['wh'], batch['reg_mask'], batch['ind'], batch['wh'])
+            hm_loss += self.crit(output['hm'], batch['hm']) / opt.num_stacks
+            if opt.wh_weight > 0:
+                wh_loss += self.crit_reg(
+                    output['wh'], batch['reg_mask'],
+                    batch['ind'], batch['wh']) / opt.num_stacks
 
-        off_loss = self.crit_reg(output['reg'], batch['reg_mask'], batch['ind'], batch['reg'])
+            if opt.reg_offset and opt.off_weight > 0:
+                off_loss += self.crit_reg(output['reg'], batch['reg_mask'],
+                                          batch['ind'], batch['reg']) / opt.num_stacks
 
-        id_head = _tranpose_and_gather_feat(output['id'], batch['ind'])
-        id_head = id_head[batch['reg_mask'] > 0].contiguous()
-        id_head = math.sqrt(2) * math.log(opt.nID - 1)* F.normalize(id_head)
-        id_target = batch['ids'][batch['reg_mask'] > 0]
+            if opt.id_weight > 0:
+                id_head = _tranpose_and_gather_feat(output['id'], batch['ind'])
+                id_head = id_head[batch['reg_mask'] > 0].contiguous()
+                id_head = self.emb_scale * F.normalize(id_head)
+                id_target = batch['ids'][batch['reg_mask'] > 0]
 
-        id_output = self.classifier(id_head).contiguous()
-        id_loss = self.crit_id(id_output, id_target)
+                id_output = self.classifier(id_head).contiguous()
+                id_loss += self.IDLoss(id_output, id_target)
 
         det_loss = opt.hm_weight * hm_loss + opt.wh_weight * wh_loss + opt.off_weight * off_loss
 
@@ -71,8 +124,6 @@ class MotLoss(torch.nn.Module):
         loss_stats = {'loss': loss, 'hm_loss': hm_loss,
                       'wh_loss': wh_loss, 'off_loss': off_loss, 'id_loss': id_loss}
         return loss, loss_stats
-
-
 class MotTrainer(BaseTrainer):
     def __init__(self, opt, model, optimizer=None):
         super(MotTrainer, self).__init__(opt, model, optimizer=optimizer)
