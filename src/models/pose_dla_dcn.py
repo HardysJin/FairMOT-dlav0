@@ -4,7 +4,6 @@ from __future__ import print_function
 
 import os
 import sys
-print(sys.path)
 import math
 import logging
 import numpy as np
