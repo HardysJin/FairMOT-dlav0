@@ -23,13 +23,8 @@ if __name__ == '__main__':
     torch.cuda.empty_cache()
     
     opt = opts().init()
-    heads = {'hm': 1,
-             'wh': 4,
-             'reg': 2,
-             'id': opt.reid_dim,
-             }
     
-    model = get_pose_net(34, heads, 256)
+    model = get_pose_net(34, opt.heads, 256)
     model = load_model(model, opt.load_model)
     model = model.to(opt.device)
     model.eval()

@@ -63,9 +63,6 @@ class opts(object):
         self.parser.add_argument('--id_weight', type=float, default=1,
                                 help='loss weight for id')
         
-        # self.parser.add_argument('--reid_dim', type=int, default=128,
-        #                         help='feature dim for reid')
-        
         self.parser.add_argument('--ltrb', default=True,
                                 help='regress left, top, right, bottom of bbox')
         
@@ -88,10 +85,36 @@ class opts(object):
         self.parser.add_argument('--not_reg_offset', action='store_true',
                                 help='not regress local offset.')
         
-        
+        # tracking
+        self.parser.add_argument('--test_mot16', default=False, help='test mot16')
+        self.parser.add_argument('--val_mot15', default=False, help='val mot15')
+        self.parser.add_argument('--test_mot15', default=False, help='test mot15')
+        self.parser.add_argument('--val_mot16', default=False, help='val mot16 or mot15')
+        self.parser.add_argument('--test_mot17', default=False, help='test mot17')
+        self.parser.add_argument('--val_mot17', default=False, help='val mot17')
+        self.parser.add_argument('--val_mot20', default=False, help='val mot20')
+        self.parser.add_argument('--test_mot20', default=False, help='test mot20')
+        self.parser.add_argument('--val_hie', default=False, help='val hie')
+        self.parser.add_argument('--test_hie', default=False, help='test hie')
+        self.parser.add_argument('--conf_thres', type=float, default=0.4, help='confidence thresh for tracking')
+        self.parser.add_argument('--det_thres', type=float, default=0.3, help='confidence thresh for detection')
+        self.parser.add_argument('--nms_thres', type=float, default=0.4, help='iou thresh for nms')
+        self.parser.add_argument('--track_buffer', type=int, default=30, help='tracking buffer')
+        self.parser.add_argument('--min-box-area', type=float, default=100, help='filter out tiny boxes')
+        self.parser.add_argument('--input-video', type=str,
+                                default='../videos/MOT16-03.mp4',
+                                help='path to the input video')
+        self.parser.add_argument('--output-format', type=str, default='video', help='video or text')
+        self.parser.add_argument('--output-root', type=str, default='../outputs', help='expected output root path')
 
     def init(self):
         opt = self.parser.parse_args()
+        
+        opt.heads = {'hm': 1,
+             'wh': 4,
+             'reg': 2,
+             'id': opt.reid_dim,
+        }
         
         opt.reg_offset = not opt.not_reg_offset
         opt.num_stacks = 1
