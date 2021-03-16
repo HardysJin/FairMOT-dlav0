@@ -2,7 +2,8 @@
     "root":"./datasets",
     "train":
     {
-        "mot17":"./data/mot17.train"
+        "mot17":"./data/mot17.train",
+        "mot20":"./data/mot20.train"
     },
     "train_all":
     {

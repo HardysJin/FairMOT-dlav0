@@ -191,3 +191,9 @@ class ModulatedDeformConvFunction(Function):
 
 deform_conv = DeformConvFunction.apply
 modulated_deform_conv = ModulatedDeformConvFunction.apply
+print(type(modulated_deform_conv))
+# from torch.onnx import register_custom_op_symbolic
+# print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!register_custom_op_symbolic called")
+# register_custom_op_symbolic('custom_namespace::DCNv2', ModulatedDeformConvFunction.symbolic, opset_version=9)
+# register_custom_op_symbolic('torchvision::roi_align', roi_align, _onnx_opset_version)
+# register_custom_op_symbolic('torchvision::roi_pool', roi_pool, _onnx_opset_version)

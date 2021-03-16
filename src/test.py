@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 from utils import _init_paths
 
-from models.pose_dla_dcn import get_pose_net
+from models.dlav0 import get_pose_net
 from opts import opts
 
 from fair.dataset import JointDataset, LoadImages
@@ -40,17 +40,17 @@ if __name__ == '__main__':
         trainset_paths = data_config['train']
         dataset_root = data_config['root']
 
-    T = transforms.Compose([transforms.ToTensor()])
-    dataset = JointDataset(opt, dataset_root, trainset_paths, img_size=(1088, 608), augment=False, transforms=T)
+    # T = transforms.Compose([transforms.ToTensor()])
+    # dataset = JointDataset(opt, dataset_root, trainset_paths, img_size=(1088, 608), augment=False, transforms=T)
     
-    dataloader = torch.utils.data.DataLoader(
-        dataset,
-        batch_size=opt.batch_size,
-        shuffle=True,
-        num_workers=opt.num_workers,
-        pin_memory=True,
-        drop_last=True
-    )
+    # dataloader = torch.utils.data.DataLoader(
+    #     dataset,
+    #     batch_size=opt.batch_size,
+    #     shuffle=True,
+    #     num_workers=opt.num_workers,
+    #     pin_memory=True,
+    #     drop_last=True
+    # )
 
     dataset = LoadImages("/home/hardys/Desktop/000058.jpg")
 
@@ -74,6 +74,8 @@ if __name__ == '__main__':
         
         pred_hm = output['hm'].cpu().detach().numpy()[0]
         pred_hm = np.moveaxis(pred_hm, 0, -1)
+        print(np.min(pred_hm), np.max(pred_hm))
+
         plt.subplot(1,2,2)
         plt.imshow(pred_hm)
         plt.show()

@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 from utils import _init_paths
 
-from models.pose_dla_dcn import get_pose_net
+from models.dlav0 import get_pose_net
 from opts import opts
 
 from fair.dataset import JointDataset
@@ -129,7 +129,14 @@ if __name__ == '__main__':
     
     for epoch in range(start_epoch, opt.num_epochs + 1):
         log_dict_train, _ = trainer.train(epoch, dataloader)
-        print(log_dict_train)
+        
+        if epoch in opt.lr_step:
+            save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(epoch)),
+                       epoch, model, optimizer)
+            lr = opt.lr * (0.1 ** (opt.lr_step.index(epoch) + 1))
+            print('Drop LR to', lr)
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = lr
         if epoch % 5 == 0 or epoch >= 25:
             save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(epoch)),
                        epoch, model, optimizer)

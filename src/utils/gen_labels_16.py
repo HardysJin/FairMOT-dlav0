@@ -7,8 +7,8 @@ def mkdirs(d):
     if not osp.exists(d):
         os.makedirs(d)
 
-seq_root = '../datasets/MOT17/images/train'
-label_root = '../datasets/MOT17/labels_with_ids/train'
+seq_root = '../datasets/MOT20/images/train'
+label_root = '../datasets/MOT20/labels_with_ids/train'
 mkdirs(label_root)
 seqs = [s for s in os.listdir(seq_root)]
 
