@@ -250,18 +250,18 @@ class JDETracker(object):
             output = self.model(im_blob)[-1]
             hm = output['hm'].sigmoid_()
             
-            plt.subplot(1,2,1) 
-            img = np.squeeze(im_blob.cpu().numpy()[0])
-            img = np.moveaxis(img, 0, -1)
-            plt.imshow(img)
-            # plt.imshow(img0)
+            # plt.subplot(1,2,1) 
+            # img = np.squeeze(im_blob.cpu().numpy()[0])
+            # img = np.moveaxis(img, 0, -1)
+            # plt.imshow(img)
+            # # plt.imshow(img0)
             
-            pred_hm = output['hm'].cpu().detach().numpy()[0]
-            pred_hm = np.moveaxis(pred_hm, 0, -1)
-            plt.subplot(1,2,2)
-            plt.imshow(pred_hm)
+            # pred_hm = output['hm'].cpu().detach().numpy()[0]
+            # pred_hm = np.moveaxis(pred_hm, 0, -1)
+            # plt.subplot(1,2,2)
+            # plt.imshow(pred_hm)
             
-            plt.show()
+            # plt.show()
             
             wh = output['wh']
             id_feature = output['id']
