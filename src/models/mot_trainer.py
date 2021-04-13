@@ -76,7 +76,8 @@ class MotLoss(torch.nn.Module):
     def __init__(self, opt):
         super(MotLoss, self).__init__()
         self.crit = torch.nn.MSELoss() if opt.mse_loss else FocalLoss()
-        self.crit_reg = RegL1Loss()
+        self.crit_reg = RegL1Loss() if opt.reg_loss == 'l1' else \
+            RegLoss() if opt.reg_loss == 'sl1' else None
         self.crit_wh = torch.nn.L1Loss(reduction='sum') if opt.dense_wh else \
             NormRegL1Loss() if opt.norm_wh else \
                 RegWeightedL1Loss() if opt.cat_spec_wh else self.crit_reg
@@ -124,6 +125,8 @@ class MotLoss(torch.nn.Module):
         loss_stats = {'loss': loss, 'hm_loss': hm_loss,
                       'wh_loss': wh_loss, 'off_loss': off_loss, 'id_loss': id_loss}
         return loss, loss_stats
+
+
 class MotTrainer(BaseTrainer):
     def __init__(self, opt, model, optimizer=None):
         super(MotTrainer, self).__init__(opt, model, optimizer=optimizer)

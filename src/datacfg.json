@@ -1,13 +1,19 @@
 {
-    "root":"./datasets",
+    "root":"../datasets",
     "train":
     {
         "mot17":"./data/mot17.train",
-        "mot20":"./data/mot20.train"
+        "mot20":"./data/mot20.train",
+        "cuhksysu":"./data/cuhksysu.train",
+        "prw":"./data/prw.train",
+        "eth":"./data/eth.train",
+        "crowdhuman_train":"./data/crowdhuman.train",
+        "crowdhuman_test":"./data/crowdhuman.val"
     },
     "train_all":
     {
         "mot17":"./data/mot17.train",
+        "mot20":"./data/mot20.train",
         "caltech":"./data/caltech.all",
         "citypersons":"./data/citypersons.train",
         "cuhksysu":"./data/cuhksysu.train",

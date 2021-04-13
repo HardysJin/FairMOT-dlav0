@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 from utils import _init_paths
 
-from models.dlav0 import get_pose_net
+# from models.dlav0 import get_pose_net
 from opts import opts
 
 from fair.dataset import JointDataset, LoadImages
@@ -17,14 +17,16 @@ from models.mot_trainer import MotTrainer
 
 from fair.decode import mot_decode
 
-from fair.model import load_model, save_model
+from fair.model import *
 
 if __name__ == '__main__':
     torch.cuda.empty_cache()
     
-    opt = opts().init()
+    opt = opts().parse()
     
-    model = get_pose_net(34, opt.heads, 256)
+    # model = get_pose_net(34, opt.heads, 256)
+    print('Creating model...')
+    model = create_model(opt.arch, opt.heads, opt.head_conv)
     model = load_model(model, opt.load_model)
     model = model.to(opt.device)
     model.eval()

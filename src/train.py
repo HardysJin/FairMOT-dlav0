@@ -9,25 +9,22 @@ import matplotlib.pyplot as plt
 
 from utils import _init_paths
 
-from models.dlav0 import get_pose_net
 from opts import opts
-
 from fair.dataset import JointDataset
-from models.mot_trainer import MotTrainer
-
 from fair.decode import mot_decode
+from fair.model import create_model, load_model, save_model
 
-from fair.model import load_model, save_model
+from models.mot_trainer import MotTrainer
 
 
 if __name__ == '__main__':
     torch.cuda.empty_cache()
     
-    opt = opts().init()
+    opt = opts().parse()
+    
+    torch.manual_seed(opt.seed)
+    torch.backends.cudnn.benchmark = not opt.not_cuda_benchmark and not opt.test
 
-    model = get_pose_net(34, opt.heads, 256)
-
-    # print(model)
     with open("./datacfg.json", 'r') as f:
         import json
         data_config = json.load(f)
@@ -35,8 +32,8 @@ if __name__ == '__main__':
         dataset_root = data_config['root']
 
     T = transforms.Compose([transforms.ToTensor()])
-    dataset = JointDataset(opt, dataset_root, trainset_paths, img_size=(1088, 608), augment=False, transforms=T)
-    
+    dataset = JointDataset(opt, dataset_root, trainset_paths, img_size=(1088, 608), augment=True, transforms=T)
+    opt = opts().update_dataset_info_and_set_heads(opt, dataset)
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=opt.batch_size,
@@ -46,12 +43,17 @@ if __name__ == '__main__':
         drop_last=True
     )
     
+    os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpus_str
+    opt.device = torch.device('cuda' if opt.gpus[0] >= 0 else 'cpu')
+    
+    print('Creating model...')
+    model = create_model(opt.arch, opt.heads, opt.head_conv)
+    
     optimizer = torch.optim.Adam(model.parameters(), opt.lr)
     
     trainer = MotTrainer(opt, model, optimizer)
     trainer.set_device(opt.gpus, [opt.batch_size], opt.device)
     start_epoch = 1
-
     # model.load_state_dict(torch.load("../pretrained/fairmot_dla34.pth"))
     if opt.resume:
         model, optimizer, start_epoch = load_model(model, opt.load_model, trainer.optimizer, opt.resume, opt.lr, opt.lr_step)
@@ -72,40 +74,4 @@ if __name__ == '__main__':
                        epoch, model, optimizer)
         
         
-    save_model(os.path.join(opt.save_dir, 'mot_{}.pth'.format(epoch)), epoch, model, optimizer)
-        
-        
-    # for iter_id, batch in enumerate(dataloader):
-    #     for i, (k, v) in enumerate(batch.items()):
-    #         print(k, v.shape)
-    #     plt.subplot(2,2,1)
-    #     img = np.squeeze(batch['input'].numpy()[0])
-    #     img = np.moveaxis(img, 0, -1)
-    #     plt.imshow(img)
-    #     plt.subplot(2,2,2)
-    #     img2 = batch['hm'].numpy()[0]
-    #     img2 = np.moveaxis(img2, 0, -1)
-    #     plt.imshow(img2)
-        
-        
-    #     input = batch['input'].cuda()
-    #     model.cuda()
-    #     output = model(input)[-1]
-    #     print(output.keys())
-        
-    #     dets, inds = mot_decode(output['hm'].sigmoid_(), output['wh'], reg=None, ltrb=opt.ltrb, K=opt.K)
-        
-    #     print(dets.shape, inds.shape)
-        
-    #     pred_hm = output['hm'].cpu().detach().numpy()[0]
-    #     pred_hm = np.moveaxis(pred_hm, 0, -1)
-    #     plt.subplot(2,2,3)
-    #     plt.imshow(pred_hm)
-        
-    #     plt.show()
-    #     break
-
-
-    # torch.save(model.cpu().state_dict(), "../pretrained/final_mot.pth")
-    # dummy_input = torch.randn(1, 3, 608, 1088, device='cuda')
-    # torch.onnx.export(model, dummy_input, "../pretrained/final_mot.onnx", verbose=True)
+    save_model(os.path.join(opt.save_dir, '{}_{}.pth'.format(opt.exp_id, epoch)), epoch, model, optimizer)
