@@ -9,7 +9,7 @@ import torch
 import cv2
 import torch.nn.functional as F
 
-from .model import load_model
+from .model import create_model, load_model
 from .decode import mot_decode
 from .tracking_utils.utils import *
 from .tracking_utils.log import logger
@@ -21,7 +21,6 @@ from .utils.post_process import ctdet_post_process
 from .utils.image import get_affine_transform
 from .utils.utils import _tranpose_and_gather_feat
 
-from models.dlav0 import get_pose_net
 
 class STrack(BaseTrack):
     shared_kalman = KalmanFilter()
@@ -37,19 +36,46 @@ class STrack(BaseTrack):
         self.tracklet_len = 0
 
         self.smooth_feat = None
-        self.update_features(temp_feat)
         self.features = deque([], maxlen=buffer_size)
+        self.scores = deque([], maxlen=buffer_size)
+        self.update_features(temp_feat)
+
         self.alpha = 0.9
+        self.softmax = torch.nn.Softmax(dim=0)
 
     def update_features(self, feat):
         feat /= np.linalg.norm(feat)
         self.curr_feat = feat
+
         if self.smooth_feat is None:
             self.smooth_feat = feat
         else:
+            # alpha = 
             self.smooth_feat = self.alpha * self.smooth_feat + (1 - self.alpha) * feat
+            # self.update_smooth_feat()
         self.features.append(feat)
+        self.scores.append(self.score)
         self.smooth_feat /= np.linalg.norm(self.smooth_feat)
+
+    def update_smooth_feat(self): # TODO: refactor using prev smooth feature
+        assert len(self.scores) == len(self.features), "Error: length of score should equal to length of feature"
+        num_prev_feat = len(self.features)
+        # define iintial weights 1/x, x is the last x feature; Try different initial weights
+        initial_weights = torch.tensor([1 for x in range(num_prev_feat, 0, -1)]).cuda()
+        # print(initial_weights)
+        # print(torch.tensor(self.scores).cuda())
+        weights = initial_weights * torch.tensor(self.scores).cuda()
+        # print(weights)
+        # raise Exception
+        # max_score
+        weights = self.softmax(weights)
+        # print("w", weights)
+        # weigght * self.features
+        feats = torch.tensor(self.features).cuda()
+        # print(feats)
+        feats = (feats.T * weights).T
+        # print(feats.shape)
+        self.smooth_feat = feats[0].cpu().numpy()
 
     def predict(self):
         mean_state = self.mean.copy()
@@ -181,7 +207,7 @@ class JDETracker(object):
         else:
             opt.device = torch.device('cpu')
         print('Creating model...')
-        self.model = get_pose_net(34, opt.heads, 256)
+        self.model = create_model(opt.arch, opt.heads, opt.head_conv)
         self.model = load_model(self.model, opt.load_model)
         self.model = self.model.to(opt.device)
         self.model.eval()
@@ -202,7 +228,7 @@ class JDETracker(object):
 
     def post_process(self, dets, meta):
         dets = dets.detach().cpu().numpy()
-        dets = dets.reshape(1, -1, dets.shape[2])
+        dets = dets.reshape(1, -1, dets.shape[-1])
         dets = ctdet_post_process(
             dets.copy(), [meta['c']], [meta['s']],
             meta['out_height'], meta['out_width'], self.opt.num_classes)
@@ -245,40 +271,32 @@ class JDETracker(object):
 
         ''' Step 1: Network forward, get detections & embeddings'''
         with torch.no_grad():
-            # print(im_blob.shape)
-            # print(self.model)
             output = self.model(im_blob)[-1]
             hm = output['hm'].sigmoid_()
-            
-            # plt.subplot(1,2,1) 
-            # img = np.squeeze(im_blob.cpu().numpy()[0])
-            # img = np.moveaxis(img, 0, -1)
-            # plt.imshow(img)
-            # # plt.imshow(img0)
-            
-            # pred_hm = output['hm'].cpu().detach().numpy()[0]
-            # pred_hm = np.moveaxis(pred_hm, 0, -1)
-            # plt.subplot(1,2,2)
-            # plt.imshow(pred_hm)
-            
-            # plt.show()
-            
             wh = output['wh']
             id_feature = output['id']
             id_feature = F.normalize(id_feature, dim=1)
 
             reg = output['reg'] if self.opt.reg_offset else None
-            dets, inds = mot_decode(hm, wh, reg=reg, ltrb=self.opt.ltrb, K=self.opt.K)
+            dets, inds = mot_decode(hm, wh, reg=reg, ltrb=self.opt.ltrb, K=self.opt.K, conf_thres=self.opt.conf_thres)
+            
             id_feature = _tranpose_and_gather_feat(id_feature, inds)
+            # dets = dets.squeeze(0)
+            # id_feature = get_reid_feat(id_feature, boxes=dets[:, :4])
+            
             id_feature = id_feature.squeeze(0)
             id_feature = id_feature.cpu().numpy()
-
-        dets = self.post_process(dets, meta)
+            
+        # print(dets, inds)
+        try:
+            dets = self.post_process(dets, meta)
+        except IndexError:
+            print(dets, inds)
         dets = self.merge_outputs([dets])[1]
 
-        remain_inds = dets[:, 4] > self.opt.conf_thres
-        dets = dets[remain_inds]
-        id_feature = id_feature[remain_inds]
+        # remain_inds = dets[:, 4] > self.opt.conf_thres
+        # dets = dets[remain_inds]
+        # id_feature = id_feature[remain_inds]
 
         # vis
         '''
@@ -294,6 +312,7 @@ class JDETracker(object):
 
         if len(dets) > 0:
             '''Detections'''
+            # dets[:, :5]: bboxes (4), score (1)
             detections = [STrack(STrack.tlbr_to_tlwh(tlbrs[:4]), tlbrs[4], f, 30) for
                           (tlbrs, f) in zip(dets[:, :5], id_feature)]
         else:
@@ -314,9 +333,15 @@ class JDETracker(object):
         #for strack in strack_pool:
             #strack.predict()
         STrack.multi_predict(strack_pool)
+        # strack_pool:  previous tracklets
+        # detections:   current tracklets
         dists = matching.embedding_distance(strack_pool, detections)
         #dists = matching.iou_distance(strack_pool, detections)
         dists = matching.fuse_motion(self.kalman_filter, dists, strack_pool, detections)
+
+        # matches:      [idx of tracked_stracks, idx of detections]
+        # u_track:      [index of undefined track]
+        # u_detection:  [index of undefined detection]
         matches, u_track, u_detection = matching.linear_assignment(dists, thresh=0.4)
 
         for itracked, idet in matches:
@@ -424,6 +449,19 @@ def sub_stracks(tlista, tlistb):
 
 
 def remove_duplicate_stracks(stracksa, stracksb):
+    pdist = matching.iou_distance(stracksa, stracksb)
+    pairs = np.where(pdist < 0.15)
+    dupa, dupb = list(), list()
+    for p, q in zip(*pairs):
+        timep = stracksa[p].frame_id - stracksa[p].start_frame
+        timeq = stracksb[q].frame_id - stracksb[q].start_frame
+        if timep > timeq:
+            dupb.append(q)
+        else:
+            dupa.append(p)
+    resa = [t for i, t in enumerate(stracksa) if not i in dupa]
+    resb = [t for i, t in enumerate(stracksb) if not i in dupb]
+    return resa, resb
     pdist = matching.iou_distance(stracksa, stracksb)
     pairs = np.where(pdist < 0.15)
     dupa, dupb = list(), list()

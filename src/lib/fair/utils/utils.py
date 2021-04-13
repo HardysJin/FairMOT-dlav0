@@ -186,6 +186,7 @@ def _sigmoid(x):
 def _gather_feat(feat, ind, mask=None):
     dim  = feat.size(2)
     ind  = ind.unsqueeze(2).expand(ind.size(0), ind.size(1), dim)
+    
     feat = feat.gather(1, ind)
     if mask is not None:
         mask = mask.unsqueeze(2).expand_as(feat)
@@ -195,9 +196,42 @@ def _gather_feat(feat, ind, mask=None):
 
 def _tranpose_and_gather_feat(feat, ind):
     feat = feat.permute(0, 2, 3, 1).contiguous()
+    
     feat = feat.view(feat.size(0), -1, feat.size(3))
+    
     feat = _gather_feat(feat, ind)
+    
     return feat
+
+def get_reid_feat(feat, boxes):
+  # print("=============== Re-ID Feature ===============")
+  # feat = feat.permute().contiguous()
+  # feat = feat.view(feat.size(0), -1, feat.size(3))
+  # print(feat.shape, boxes[0])
+  
+  # top left x,y ; bottom right x,y
+  _feat = torch.zeros((boxes.size(0), feat.size(0))) # 500 128
+  boxes = boxes.long()
+  for i, (x1, y1, x2, y2) in enumerate(boxes):
+    w = x2 - x1
+    x1 = (x1+x2) / 2 - w / 5
+    x2 = (x1+x2) / 2 + w / 5
+    h = y2 - y1
+    y1 = (y1+y2) / 2 - h / 5
+    y2 = (y1+y2) / 2 + h / 5
+    # print((y1+y2)//2, (x1+x2)//2)
+    tmp = feat[:, :, y1:y2, x1:x2]
+    _feat[i] = torch.stack(list(map(torch.mean, tmp)))
+
+  # x1 = boxes[:, 0].long()
+  # print(x1[0])
+  # y1 = boxes[:, 1]
+  # x2 = boxes[:, 2]
+  # y2 = boxes[:, 3]
+  # print(_feat.shape)
+  # # print(feat[:, x1])
+  # print("=============== Re-ID Feature ===============")
+  return _feat
 
 def flip_tensor(x):
     return torch.flip(x, [3])
