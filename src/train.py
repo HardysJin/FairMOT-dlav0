@@ -17,25 +17,6 @@ from fair.decode import mot_decode
 from fair.model import create_model, load_model, save_model
 
 from models.mot_trainer import MotTrainer
-# from __future__ import absolute_import
-# from __future__ import division
-# from __future__ import print_function
-
-# import _init_paths
-
-# import os
-
-# import json
-# import torch
-# import torch.utils.data
-# from torchvision.transforms import transforms as T
-# from opts import opts
-# from models.model import create_model, load_model, save_model
-# from models.data_parallel import DataParallel
-# from logger import Logger
-# from datasets.dataset_factory import get_dataset
-# from trains.train_factory import train_factory
-
 
 def main(opt):
     torch.manual_seed(opt.seed)

@@ -14,7 +14,6 @@ import onnx
 from onnxToCaffe.convertCaffe import onnxToCaffe
 
 def convert(pth, _onnx, cp, cm):
-    # print(torch.__version__)
     name='mot'
 
     heads = {'hm': 1,
@@ -36,10 +35,6 @@ def convert(pth, _onnx, cp, cm):
     
     onnxToCaffe(_onnx, cp, cm)
 
-    # onnx_model = onnx.load(_onnx)  # load onnx model
-    
-    # tf_rep = prepare(onnx_model)  # prepare tf representation
-    # tf_rep.export_graph(pb)  # export the model
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
