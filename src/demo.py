@@ -23,8 +23,8 @@ def demo(opt):
     result_root = opt.output_root if opt.output_root != '' else '.'
     mkdir_if_missing(result_root)
     
-    new_name = os.path.basename(opt.input_video).replace(' ', '_').split('.')[0] + '_' +opt.arch
-    
+    new_name = os.path.basename(opt.input_video).replace(' ', '_').split('.')[0] + '_' + opt.arch
+
     logger.info('Starting tracking...')
     dataloader = datasets.LoadVideo(opt.input_video, opt.img_size)
     result_filename = os.path.join(result_root, 'results.txt')

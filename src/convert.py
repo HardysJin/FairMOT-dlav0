@@ -29,8 +29,8 @@ def convert(pth, _onnx, cp, cm):
     model.cuda()
     dummy_input = torch.randn(1, 3, 608, 1088, device='cuda')
 
-    output_names = [ 'hm' , 'wh', 'reg', 'id']
-    torch.onnx.export(model, dummy_input, _onnx, verbose=True, output_names=output_names, operator_export_type=OperatorExportTypes.ONNX, opset_version=9,)
+    # output_names = [ 'hm' , 'wh', 'reg', 'id']
+    torch.onnx.export(model, dummy_input, _onnx, verbose=True,  operator_export_type=OperatorExportTypes.ONNX, opset_version=9,)
     
     onnx.checker.check_model(_onnx)
     

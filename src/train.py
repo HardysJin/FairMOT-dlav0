@@ -4,10 +4,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch import optim
-from torchvision import transforms
+from torchvision import transforms as T
 import matplotlib.pyplot as plt
+import json
 
 from utils import _init_paths
+from utils.logger import Logger
 
 from opts import opts
 from fair.dataset import JointDataset
@@ -15,26 +17,54 @@ from fair.decode import mot_decode
 from fair.model import create_model, load_model, save_model
 
 from models.mot_trainer import MotTrainer
+# from __future__ import absolute_import
+# from __future__ import division
+# from __future__ import print_function
+
+# import _init_paths
+
+# import os
+
+# import json
+# import torch
+# import torch.utils.data
+# from torchvision.transforms import transforms as T
+# from opts import opts
+# from models.model import create_model, load_model, save_model
+# from models.data_parallel import DataParallel
+# from logger import Logger
+# from datasets.dataset_factory import get_dataset
+# from trains.train_factory import train_factory
 
 
-if __name__ == '__main__':
-    torch.cuda.empty_cache()
-    
-    opt = opts().parse()
-    
+def main(opt):
     torch.manual_seed(opt.seed)
     torch.backends.cudnn.benchmark = not opt.not_cuda_benchmark and not opt.test
 
-    with open("./datacfg.json", 'r') as f:
-        import json
-        data_config = json.load(f)
-        trainset_paths = data_config['train']
-        dataset_root = data_config['root']
-
-    T = transforms.Compose([transforms.ToTensor()])
-    dataset = JointDataset(opt, dataset_root, trainset_paths, img_size=(1088, 608), augment=True, transforms=T)
+    print('Setting up data...')
+    f = open(opt.data_cfg)
+    data_config = json.load(f)
+    trainset_paths = data_config['train']
+    dataset_root = data_config['root']
+    f.close()
+    transforms = T.Compose([T.ToTensor()])
+    dataset = JointDataset(opt, dataset_root, trainset_paths, (1088, 608), augment=True, transforms=transforms)
     opt = opts().update_dataset_info_and_set_heads(opt, dataset)
-    dataloader = torch.utils.data.DataLoader(
+    print(opt)
+
+    logger = Logger(opt)
+
+    os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpus_str
+    opt.device = torch.device('cuda' if opt.gpus[0] >= 0 else 'cpu')
+
+    print('Creating model...')
+    model = create_model(opt.arch, opt.heads, opt.head_conv)
+    optimizer = torch.optim.Adam(model.parameters(), opt.lr)
+    start_epoch = 0
+
+    # Get dataloader
+
+    train_loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=opt.batch_size,
         shuffle=True,
@@ -42,26 +72,31 @@ if __name__ == '__main__':
         pin_memory=True,
         drop_last=True
     )
-    
-    os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpus_str
-    opt.device = torch.device('cuda' if opt.gpus[0] >= 0 else 'cpu')
-    
-    print('Creating model...')
-    model = create_model(opt.arch, opt.heads, opt.head_conv)
-    
-    optimizer = torch.optim.Adam(model.parameters(), opt.lr)
-    
+
+    print('Starting training...')
+
     trainer = MotTrainer(opt, model, optimizer)
-    trainer.set_device(opt.gpus, [opt.batch_size], opt.device)
-    start_epoch = 1
-    # model.load_state_dict(torch.load("../pretrained/fairmot_dla34.pth"))
-    if opt.resume:
-        model, optimizer, start_epoch = load_model(model, opt.load_model, trainer.optimizer, opt.resume, opt.lr, opt.lr_step)
-    
-    
-    for epoch in range(start_epoch, opt.num_epochs + 1):
-        log_dict_train, _ = trainer.train(epoch, dataloader)
-        
+    trainer.set_device(opt.gpus, opt.chunk_sizes, opt.device)
+
+    if opt.load_model != '':
+        model, optimizer, start_epoch = load_model(
+            model, opt.load_model, trainer.optimizer, opt.resume, opt.lr, opt.lr_step)
+    print('LR', optimizer.param_groups[0]['lr'])
+    for epoch in range(start_epoch + 1, opt.num_epochs + 1):
+        mark = epoch if opt.save_all else 'last'
+        log_dict_train, _ = trainer.train(epoch, train_loader)
+        logger.write('epoch: {} |'.format(epoch))
+        for k, v in log_dict_train.items():
+            logger.scalar_summary('train_{}'.format(k), v, epoch)
+            logger.write('{} {:8f} | '.format(k, v))
+
+        if opt.val_intervals > 0 and epoch % opt.val_intervals == 0:
+            save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(mark)),
+                       epoch, model, optimizer)
+        else:
+            save_model(os.path.join(opt.save_dir, 'model_last.pth'),
+                       epoch, model, optimizer)
+        logger.write('\n')
         if epoch in opt.lr_step:
             save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(epoch)),
                        epoch, model, optimizer)
@@ -72,6 +107,10 @@ if __name__ == '__main__':
         if epoch % 5 == 0 or epoch >= 25:
             save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(epoch)),
                        epoch, model, optimizer)
-        
-        
-    save_model(os.path.join(opt.save_dir, '{}_{}.pth'.format(opt.exp_id, epoch)), epoch, model, optimizer)
+    logger.close()
+
+
+if __name__ == '__main__':
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1'
+    opt = opts().parse()
+    main(opt)

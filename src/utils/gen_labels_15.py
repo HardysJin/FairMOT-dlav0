@@ -7,10 +7,13 @@ def mkdirs(d):
     if not osp.exists(d):
         os.makedirs(d)
 
-seq_root = '../../datasets/MOT16/images/train'
-label_root = '../../datasets/MOT16/labels_with_ids/train'
+
+seq_root = '../../datasets/MOT15/images/train'
+label_root = '../../datasets/MOT15/labels_with_ids/train'
 mkdirs(label_root)
-seqs = [s for s in os.listdir(seq_root)]
+#seqs = [s for s in os.listdir(seq_root)]
+seqs = ['ADL-Rundle-6', 'ETH-Bahnhof', 'KITTI-13', 'PETS09-S2L1', 'TUD-Stadtmitte', 'ADL-Rundle-8', 'KITTI-17',
+        'ETH-Pedcross2', 'ETH-Sunnyday', 'TUD-Campus', 'Venice-2']
 
 tid_curr = 0
 tid_last = -1
@@ -21,12 +24,14 @@ for seq in seqs:
 
     gt_txt = osp.join(seq_root, seq, 'gt', 'gt.txt')
     gt = np.loadtxt(gt_txt, dtype=np.float64, delimiter=',')
+    idx = np.lexsort(gt.T[:2, :])
+    gt = gt[idx, :]
 
     seq_label_root = osp.join(label_root, seq, 'img1')
     mkdirs(seq_label_root)
 
-    for fid, tid, x, y, w, h, mark, label, _ in gt:
-        if mark == 0 or not label == 1:
+    for fid, tid, x, y, w, h, mark, _, _, _ in gt:
+        if mark == 0:
             continue
         fid = int(fid)
         tid = int(tid)

@@ -23,6 +23,15 @@ _model_factory = {
   'hrnet': get_pose_net_hrnet
 }
 
+_model_factory = {
+  'dlav0': get_dlav0, # default DLAup
+  'dla': get_dla_dcn,
+  'dlaconv': get_dla_conv,
+  'resdcn': get_pose_net_dcn,
+  'resfpndcn': get_pose_net_fpn_dcn,
+  'hrnet': get_pose_net_hrnet
+}
+
 def create_model(arch, heads, head_conv):
   num_layers = int(arch[arch.find('_') + 1:]) if '_' in arch else 0
   arch = arch[:arch.find('_')] if '_' in arch else arch
@@ -69,7 +78,7 @@ def load_model(model, model_path, optimizer=None, resume=False,
   # resume optimizer parameters
   if optimizer is not None and resume:
     if 'optimizer' in checkpoint:
-      optimizer.load_state_dict(checkpoint['optimizer'])
+      # optimizer.load_state_dict(checkpoint['optimizer'])
       start_epoch = checkpoint['epoch']
       start_lr = lr
       for step in lr_step:

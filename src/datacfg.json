@@ -2,13 +2,12 @@
     "root":"../datasets",
     "train":
     {
-        "mot17":"./data/mot17.train",
+        "mot15":"./data/mot15.train",
+        "mot16":"./data/mot16.train",
         "mot20":"./data/mot20.train",
-        "cuhksysu":"./data/cuhksysu.train",
-        "prw":"./data/prw.train",
         "eth":"./data/eth.train",
-        "crowdhuman_train":"./data/crowdhuman.train",
-        "crowdhuman_test":"./data/crowdhuman.val"
+        "cuhksysu":"./data/cuhksysu.train",
+        "prw":"./data/prw.train"
     },
     "train_all":
     {

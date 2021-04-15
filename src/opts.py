@@ -71,7 +71,7 @@ class opts(object):
     # train
     self.parser.add_argument('--lr', type=float, default=1e-4,
                              help='learning rate for batch size 12.')
-    self.parser.add_argument('--lr_step', type=str, default='20',
+    self.parser.add_argument('--lr_step', type=str, default='20,25',
                              help='drop learning rate by 10.')
     self.parser.add_argument('--num_epochs', type=int, default=30,
                              help='total training epochs.')
