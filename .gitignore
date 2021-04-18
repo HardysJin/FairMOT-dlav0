@@ -4,3 +4,4 @@ demos
 pretrained/*
 exp
 src/output
+*.pyc 
